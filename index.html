@@ -31,7 +31,7 @@
         div.movie {display: inline-block; width: auto; padding: 10px; box-shadow: 2px 2px 7px #ccc; margin: 5px;}
         div.movie div.movie-img {width: 200px; height: 200px; cursor: pointer; overflow: hidden;}
         div.movie div.movie-img img {width: 100%; height: 100%; object-fit: cover;}
-        div.movie div.title {text-align: center; overflow: hidden; text-overflow: ellipsis; width: 200px; white-space: nowrap; }
+        div.movie div.title {text-align: center; width: 200px; white-space: normal; word-wrap: break-word;}
         div.field {color: var(--primary); text-transform: uppercase; font-size: 12px;}
     </style>
     <script type="text/javascript" src="config.js"></script>
@@ -282,22 +282,19 @@
             document.getElementById('main').innerHTML = searchView();
         };
 
-        const addFromAPIContr = (m, btnElement) => {
-        if (!m || !m.title) return;
-        if (btnElement) {
+    const addFromAPIContr = async (m, btnElement) => {
+    if (!m || !m.title) return;
+    if (btnElement) {
         btnElement.disabled = true;
     }
-        let title = m.title;
-        let director = "Unknown";
-        let thumbnail = m.poster_path ? "https://image.tmdb.org/t/p/w200" + m.poster_path : "files/noimage.png";
 
-        let my_movies = JSON.parse(localStorage.my_movies);
+    let my_movies = JSON.parse(localStorage.my_movies);
 
-        let exists = false;
-        let j = 0;
-         while (j < my_movies.length) {
-            if (my_movies[j].title === title) exists = true;
-            j++;
+    let exists = false;
+    let j = 0;
+    while (j < my_movies.length) {
+        if (my_movies[j].id === m.id) exists = true;
+        j++;
     }
 
     if (exists) {
@@ -308,8 +305,38 @@
         return;
     }
 
+    let director = "Unknown";
+    const options = {
+        method: 'GET',
+        headers: {
+            accept: 'application/json',
+            Authorization: 'Bearer ' + TMDB_TOKEN
+        }
+    };
+
+    try {
+        let response = await fetch(`https://api.themoviedb.org/3/movie/${m.id}/credits`, options);
+        if (response.ok) {
+            let credits = await response.json();
+            let crew = credits.crew || [];
+            let k = 0;
+            while (k < crew.length) {
+                if (crew[k].job === "Director") {
+                    director = crew[k].name;
+                    break;
+                }
+                k++;
+            }
+        }
+    } catch (err) {
+        console.error(err);
+    }
+
+    let thumbnail = m.poster_path ? "https://image.tmdb.org/t/p/w200" + m.poster_path : "files/noimage.png";
+
     my_movies.push({
-        title: title,
+        id: m.id,
+        title: m.title,
         director: director,
         thumbnail: thumbnail
     });
