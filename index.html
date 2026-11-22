@@ -181,7 +181,7 @@
             </div>`;
             return view;
         };
-        const keywordsView = (keywords) => {
+        const keywordsView = (movieId, keywords) => {
     let view = `<h2>Movie Keywords</h2>`;
     if (!keywords || keywords.length === 0) {
         view += `<p>No keywords available.</p>`;
@@ -189,7 +189,7 @@
         view += `<ul>`;
         let i = 0;
         while (i < keywords.length) {
-            view += `<li>${keywords[i]} <button class="add-keyword" data-keyword="${keywords[i]}">Add to my list</button></li>`;
+            view += `<li>${keywords[i]} <button class="add-keyword" data-keyword="${keywords[i]}" data-movie-id="${movieId}">Add to my list</button></li>`;
             i++;
         }
         view += `</ul>`;
@@ -251,8 +251,7 @@ const myKeywordsView = (savedKeywords) => {
             };
 
             try {
-                let response = await fetch('https://api.themoviedb.org/3/search/movie?query=' + query, options);
-                
+                let response = await fetch('https://api.themoviedb.org/3/search/movie?query=' + encodeURIComponent(query), options);
             if (!response.ok) {
             if (response.status === 404) throw new Error("Resource not found (404)");
             else if (response.status >= 400 && response.status < 500) throw new Error("Client error (" + response.status + "). Check your API key and your request.");
@@ -406,7 +405,7 @@ const processKeywords = (keywords) => {
         }
         i++;
     }
-    return cleanedList;
+    return cleanedList.sort((a, b) => a.localeCompare(b));
 };
 
 const keywordsContr = async (movieId) => {
@@ -428,7 +427,7 @@ const keywordsContr = async (movieId) => {
         if (!response.ok) throw new Error("Error fetching keywords (" + response.status + ")");
         let data = await response.json();
         let cleanedList = processKeywords(data.keywords || []);
-        document.getElementById('main').innerHTML = keywordsView(cleanedList, movieId);
+        document.getElementById('main').innerHTML = keywordsView(movieId, cleanedList);
     } catch (err) {
         console.error(err);
         alert("Error loading keywords: " + err.message);
