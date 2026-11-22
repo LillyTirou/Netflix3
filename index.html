@@ -28,10 +28,10 @@
         h2 { margin-block-start: 0px; margin-block-end: 10px; font-size: 20px;  color: var(--primary);}
         button:hover { background: var(--primary); color: white; }
         div.actions { margin-top: 10px;}
-        div.movie {display: inline-block; width: auto; padding: 10px; box-shadow: 2px 2px 7px #ccc; margin: 5px;}
+        div.movie {display: inline-block; vertical-align: top; width: 220px; min-height: 280px; padding: 10px; box-shadow: 2px 2px 7px #ccc; margin: 5px; box-sizing: border-box;}
         div.movie div.movie-img {width: 200px; height: 200px; cursor: pointer; overflow: hidden;}
         div.movie div.movie-img img {width: 100%; height: 100%; object-fit: cover;}
-        div.movie div.title {text-align: center; width: 200px; white-space: normal; word-wrap: break-word;}
+        div.movie div.title {text-align: center; width: 100%; min-height: 36px; white-space: normal; word-wrap: break-word;}
         div.field {color: var(--primary); text-transform: uppercase; font-size: 12px;}
     </style>
     <script type="text/javascript" src="config.js"></script>
@@ -47,7 +47,7 @@
     ];
 
         localStorage.my_movies = localStorage.my_movies || JSON.stringify(initial_movies);
-
+        localStorage.my_keywords = localStorage.my_keywords || JSON.stringify([]);
         // VIEWS
         const indexView = (movies) => {
             let i=0;
@@ -66,6 +66,7 @@
                     <button class="show" data-my-id="${i}">show</button>
                     <button class="delete" data-my-id="${i}">delete</button>
                     <button class="edit" data-my-id="${i}">edit</button>
+                    ${movies[i].id ? `<button class="keywords" data-my-id="${movies[i].id}">Keywords</button>` : ""}
                     </div>
                 </div>\n`;
               i = i + 1;
@@ -75,6 +76,7 @@
                 <button class="new">Add new movie</button>
                 <button class="reset">Reset movies</button>
                 <button class="nav-search">TMDb Search</button>
+                <button class="my-keywords">My Keywords</button>
                     </div>`;
 
             return view;
@@ -167,6 +169,7 @@
                         <div class="field" style="font-size: 10px; margin-top: 4px; width: 200px; max-height: 50px; overflow: hidden; text-transform: none;">${m.overview || "No synopsis available"}</div>
                         <div class="actions">
                             <button class="add-from-api" data-my-id="${i}">Add</button>
+                            <button class="keywords" data-my-id="${m.id}">Keywords</button>
                         </div>
                     </div>\n`;
                     i++;
@@ -178,6 +181,44 @@
             </div>`;
             return view;
         };
+        const keywordsView = (keywords) => {
+    let view = `<h2>Movie Keywords</h2>`;
+    if (!keywords || keywords.length === 0) {
+        view += `<p>No keywords available.</p>`;
+    } else {
+        view += `<ul>`;
+        let i = 0;
+        while (i < keywords.length) {
+            view += `<li>${keywords[i]} <button class="add-keyword" data-keyword="${keywords[i]}">Add to my list</button></li>`;
+            i++;
+        }
+        view += `</ul>`;
+    }
+    view += `<div class="actions">
+        <button class="my-keywords">My Custom List</button>
+        <button class="index">Back</button>
+    </div>`;
+    return view;
+};
+
+const myKeywordsView = (savedKeywords) => {
+    let view = `<h2>My Custom Keywords</h2>`;
+    if (!savedKeywords || savedKeywords.length === 0) {
+        view += `<p>Your custom keyword list is empty.</p>`;
+    } else {
+        view += `<ul>`;
+        let i = 0;
+        while (i < savedKeywords.length) {
+            view += `<li>${savedKeywords[i]} <button class="delete-keyword" data-my-id="${i}">Remove</button></li>`;
+            i++;
+        }
+        view += `</ul>`;
+    }
+    view += `<div class="actions">
+        <button class="index">Back</button>
+    </div>`;
+    return view;
+};
 
         // CONTROLLERS 
         const indexContr = () => {
@@ -348,6 +389,77 @@
         const showMsg = (msg) => {
     document.getElementById('search_msg').innerHTML = msg;
 };
+const cleanKeyword = (keyword) => {
+    return keyword
+        .replace(/[^a-zñáéíóú0-9 ]+/igm, "")
+        .trim()
+        .toLowerCase();
+};
+
+const processKeywords = (keywords) => {
+    let cleanedList = [];
+    let i = 0;
+    while (i < keywords.length) {
+        let cleaned = cleanKeyword(keywords[i].name);
+        if (cleaned && !cleanedList.includes(cleaned)) {
+            cleanedList.push(cleaned);
+        }
+        i++;
+    }
+    return cleanedList;
+};
+
+const keywordsContr = async (movieId) => {
+    if (!movieId) {
+        alert("No TMDb ID available for this movie.");
+        return;
+    }
+
+    const options = {
+        method: 'GET',
+        headers: {
+            accept: 'application/json',
+            Authorization: 'Bearer ' + TMDB_TOKEN
+        }
+    };
+
+    try {
+        let response = await fetch('https://api.themoviedb.org/3/movie/' + movieId + '/keywords', options);
+        if (!response.ok) throw new Error("Error fetching keywords (" + response.status + ")");
+        let data = await response.json();
+        let cleanedList = processKeywords(data.keywords || []);
+        document.getElementById('main').innerHTML = keywordsView(cleanedList, movieId);
+    } catch (err) {
+        console.error(err);
+        alert("Error loading keywords: " + err.message);
+    }
+};
+
+const addKeywordToList = (keyword) => {
+    let cleaned = cleanKeyword(keyword);
+    if (!cleaned) return;
+
+    let list = JSON.parse(localStorage.my_keywords);
+    if (!list.includes(cleaned)) {
+        list.push(cleaned);
+        localStorage.my_keywords = JSON.stringify(list);
+        alert(`"${cleaned}" added to your list!`);
+    } else {
+        alert(`"${cleaned}" is already in your list.`);
+    }
+};
+
+const myKeywordsViewContr = () => {
+    let list = JSON.parse(localStorage.my_keywords);
+    document.getElementById('main').innerHTML = myKeywordsView(list);
+};
+
+const deleteKeywordContr = (index) => {
+    let list = JSON.parse(localStorage.my_keywords);
+    list.splice(index, 1);
+    localStorage.my_keywords = JSON.stringify(list);
+    myKeywordsViewContr();
+};
 
         // EVENT ROUTER
         const matchEvent = (ev, sel) => ev.target.matches(sel);
@@ -363,6 +475,10 @@
             else if (matchEvent(ev, '.delete')) deleteContr (myId(ev));
             else if (matchEvent(ev, '.reset'))  resetContr  ();
             else if (matchEvent(ev, '.nav-search')) showSearchContr();
+            else if (matchEvent(ev, '.keywords')) keywordsContr(myId(ev));
+            else if (matchEvent(ev, '.add-keyword')) addKeywordToList(ev.target.dataset.keyword);
+            else if (matchEvent(ev, '.my-keywords')) myKeywordsViewContr();
+            else if (matchEvent(ev, '.delete-keyword')) deleteKeywordContr(myId(ev));
             else if (matchEvent(ev, '.search')) searchContr(document.getElementById('search_query').value);
             else if (matchEvent(ev, '.add-from-api')) {
             addFromAPIContr(lastSearchResults[myId(ev)], ev.target);
